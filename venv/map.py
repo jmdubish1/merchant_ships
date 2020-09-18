@@ -55,7 +55,6 @@ class City_inv(Inventory):
             print("".join(word.ljust(colwidth) for word in row))
 
 
-
 class City:
     def __init__(self, name, info, upper=1.0, downer=1.0, painkiller=1.0):
         self.name = name

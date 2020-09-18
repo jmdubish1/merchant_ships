@@ -1,64 +1,17 @@
 from game import *
-from drugs import *
+from inventory import *
+
 
 class Map:
-    cities = []
-    upper = 1.000
-    downer = 1.000
-    painkiller = 1.000
-    one = 1.000
-    two = 1.000
-
-    def __init__(self, start_loc, city_list):
-        self.location = start_loc
-        for city in city_list:
-            self.cities.append(city)
-
-    def travel(self, city):
-        self.location = city
-        print(" ")
-        print(Color.GREEN + "You Have arrived at ", self.location.name + Color.END)
-        print(" ")
-        # set new rates
-        self.upper = round(random.uniform(0.1, 2.7), 3)
-        self.downer = round(random.uniform(0.1, 2.7), 3)
-        self.painkiller = round(random.uniform(0.1, 2.7), 3)
-        self.one = round(random.uniform(0.7, 1.3), 3)
-        self.two = round(random.uniform(0.8, 1.2), 3)
-
-    def check_demand(self):
-        print(" ")
-        print(Color.RED + "D E M A N D :" + Color.END)
-        print("Current Location: ", self.location.name)
-        print(" ")
-        print("Uppers: ", self.upper, "X")
-        print("Downers: ", self.downer, "X")
-        print("PainKillers: ", self.painkiller, "X")
-        print(" ")
-        print("Wheeze: ", round(float(Wheeze.price) * float(self.downer) * self.one, 4), "$")
-        print("Stimpak: ", round(float(Stimpak.price) * float(self.painkiller) * self.one, 4), "$")
-        print("Jet: ", round(float(Jet.price) * float(self.upper) * self.one, 4), "$")
-        print("Kram: ", round(float(Kram.price) * float(self.upper) * self.two, 4), "$")
-        print("Lsx: ", round(float(Lsx.price) * float(self.painkiller) * self.two, 4), "$")
-        print("----")
-        print(" ")
-
-    def check_location(self):
-        print(" ")
-        print(Color.RED + "L O C A T I O N :" + Color.END)
-        print("Current Location: ", self.location.name)
-        print(" ")
-        print("Location Information: ")
-        print(self.location.info)
-        print(" ")
-        print("----")
-        print(" ")
+    def __init__(self, start_loc, locations):
+        self.curr_city = City.from_list(start_loc)
+        self.cities = [loc[0] for loc in locations]
 
     def check_map(self):
         print(" ")
         print(Color.RED + "M A P :" + Color.END)
         print(" ")
-        print("Current Location: ", self.location.name)
+        print("Current Location: ", self.curr_city.name)
         print(" ")
         for city in self.cities:
             print(city.name)
@@ -66,39 +19,105 @@ class Map:
         print("----")
         print(" ")
 
+    def travel(self, city):
+        self.curr_city = City.from_list(find_item_info(city, city_list))
+
+class City_inv(Inventory):
+    '''The map's drug supply'''
+
+    def __init__(self, city_name, type_keys):
+        super().__init__(city_name)
+        self.price_adj = random.uniform(.9, 1.5)
+        self.qty_adj = random.uniform(.6, 2)
+        self.type_keys = type_keys
+
+    def generate_qty(self, drug_list):
+        '''
+        1. create a random number that will decide how many items to choose
+        2. choose that number of items randomly from the game list
+        3/4. choose random prices/qty for each (using the price/qty_adj
+        5. add to the map inventory'''
+        num_drugs = random.sample(drug_list, random.randint(1, len(drug_list)))
+        for d in num_drugs:
+            drug_supply = d[4] * random.randint(1, 10) / 6
+            drug_demand = random.uniform(.3, 1.5)
+            qty = round(self.qty_adj * drug_supply, 0)
+            self.add_item(Item.from_list(d, qty))
+            type_key = self.type_keys.get(d[1])
+            self.items[d[0]].price = round(self.items[d[0]].price * self.price_adj * drug_demand * float(type_key), 2)
+    
+    def print_items(self):
+        inv = [['Item:','Price:','Qty:','Type:','Info:']]
+        for item in self.items.values():
+            inv.append([str(x) for x in [item.name, item.price, item.qty, item.type, item.info]])
+        colwidth = max(len(word) for row in inv for word in row[:-1]) + 2
+        for row in inv:
+            print("".join(word.ljust(colwidth) for word in row))
+
+
 
 class City:
     def __init__(self, name, info, upper=1.0, downer=1.0, painkiller=1.0):
         self.name = name
         self.info = info
-        self.upper = float(upper)
-        self.downer = float(downer)
-        self.painkillter = float(painkiller)
+        type_keys = {'Upper': upper, 'Downer': downer, 'Painkiller': painkiller}
+        self.inventory = City_inv(self.name, type_keys)
 
-city_list = [City("Victory","description",1.8,0.7),
-             City("Arrival","description"),
-             City("Boost","description",1.2,1.3,0.9)]
+    @classmethod
+    def from_list(cls, city_info):
+        name, info, *c = city_info
+        return cls(name, info, *c)
+
+    def check_demand(self):
+        print(Color.RED + "L O C A T I O N :" + Color.END)
+        print("Current Location: ", self.name)
+        print(" ")
+        print("Location Information: ")
+        print(self.info)
+        print(" ")
+        print(Color.RED + "D E M A N D :" + Color.END)
+        print("Current Location: ", self.name)
+        self.inventory.print_items()
+        print(" ")
 
 
 def travel(p1,m1):
-    cost = round(random.uniform(0.1, 20.0), 3)
+    cost = round(random.uniform(0.1, 25.0), 2)
     destination = input("Where to?: ")
-    destination = destination.title()
+    city = destination.title()
     found = False
-    if (p1.cash >= cost):
+    if (p1.inventory.cash >= cost):
         for x in range(0, len(m1.cities)):
-            if (destination == m1.cities[x].name):
-                print("Found ", m1.cities[x].name, " on the map...")
+            if (destination in m1.cities):
                 found = True
-                city = m1.cities[x]
         if (found == False):
             print("I can't find this place.")
             print(" ")
         else:
+            print("Found ", len(m1.cities), " on the map...")
             print("Traveling to ", destination, " for", cost, "$")
             print(" ")
-            p1.cash = p1.cash - cost
+            p1.inventory.cash = p1.inventory.cash - cost
             m1.travel(city)
+            m1.curr_city.inventory.generate_qty(drug_list)
     else:
         print("you are too broke to travel! Try again later...")
         print(" ")
+
+
+
+        
+        
+        
+
+
+
+
+
+
+
+
+
+
+
+
